@@ -1,0 +1,11 @@
+{
+  "name": "lumos",
+  "version": "0.0.1",
+  "main": "lumos.js",
+  "keywords": ["orm", "indexeddb", "migrations", "browser"],
+  "dependencies": {
+        "requirejs": null,
+        "jasmine": null
+  }, 
+  "ignore" : ["docs", "test"]
+}
