@@ -162,7 +162,7 @@
    */
   var currentWindowOnload = window.onload;
 
-  window.runJasmine = function() {
+  window.jasmine.runTests = function() {
     if (currentWindowOnload) {
       currentWindowOnload();
     }
