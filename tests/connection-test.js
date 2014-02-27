@@ -1,14 +1,14 @@
-define(["lumos"],function(lumos, user){
+define(["Lumos"],function(Lumos, user){
   
-  describe("establishing connection to indexedDb", function() {
+  describe("initialization and migrations", function() {
     
     it("should open connection to the specified database and migrations", function(done) {
       migration1 = function(db) {
         var store = db.createObjectStore("books", {keyPath: "isbn"});
       }
 
-      lumos.connect("library",[migration1], function(){
-        expect(lumos.db().version).toBe(1)
+      Lumos.connect("library",[migration1], function(){
+        expect(Lumos.db().version).toBe(1);
         done();
       }, done);
     }); 
@@ -24,12 +24,12 @@ define(["lumos"],function(lumos, user){
         var store = db.createObjectStore("periodicals", {keyPath: "isbn"});
       }
 
-      lumos.connect("library",[migration1], function(){
-        expect(lumos.db().version).toBe(1)
-        lumos.close();
+      Lumos.connect("library",[migration1], function(){
+        expect(Lumos.db().version).toBe(1);
+        Lumos.close();
 
-          lumos.connect("library",[migration1,migration2,migration3], function(){
-            expect(lumos.db().version).toBe(3)
+          Lumos.connect("library",[migration1,migration2,migration3], function(){
+            expect(Lumos.db().version).toBe(3);
             done();
           }, done);
 
@@ -38,8 +38,8 @@ define(["lumos"],function(lumos, user){
 
     }); 
 
-    afterEach(function() {
-      lumos.destroy();
+    afterEach(function(done) {
+      Lumos.destroy(done,done);
     });
 
   });

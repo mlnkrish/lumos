@@ -1,18 +1,32 @@
-define(["lumos", "tests/models/user"],function(lumos, user){
+define(["Lumos", "tests/models/user"],function(Lumos, User){
   
-  xdescribe("establishing connection to indexedDb", function() {
+  describe("entity persistance", function() {
     
     beforeEach(function(done) {
-      lumos.connect("mydb",[], done, done);
+      migration1 = function(db) {
+        var store = db.createObjectStore("users", {autoIncrement: true});
+      }
+      Lumos.connect("application",[migration1], done, done);
+    
     });
 
-    it("should open connection to the specified database", function(done) {
-      // lumos.connect("mydb",[], done, done);
-      done();
+    it("should be able save a new entity", function(done) {
+      
+      user = new User({name:"MLN",email:"mln@gmail.com"});
+      user.save(function(){
+       
+        User.find(1, function(user){
+          expect(user.name).toBe("MLN");
+          expect(user.email).toBe("mln@gmail.com");
+          done();
+        });
+        
+      });
+
     }); 
 
-    afterEach(function() {
-      lumos.destroy();
+    afterEach(function(done) {
+      Lumos.destroy(done,done);
     });
 
 
