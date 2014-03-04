@@ -7,7 +7,7 @@ define(["Lumos"],function(Lumos, user){
         var store = db.createObjectStore("books", {keyPath: "isbn"});
       }
 
-      Lumos.connect("library",[migration1], function(){
+      Lumos.connect("app",[migration1], function(){
         expect(Lumos.db().version).toBe(1);
         done();
       }, done);
@@ -24,11 +24,11 @@ define(["Lumos"],function(Lumos, user){
         var store = db.createObjectStore("periodicals", {keyPath: "isbn"});
       }
 
-      Lumos.connect("library",[migration1], function(){
+      Lumos.connect("app",[migration1], function(){
         expect(Lumos.db().version).toBe(1);
         Lumos.close();
 
-          Lumos.connect("library",[migration1,migration2,migration3], function(){
+          Lumos.connect("app",[migration1,migration2,migration3], function(){
             expect(Lumos.db().version).toBe(3);
             done();
           }, done);

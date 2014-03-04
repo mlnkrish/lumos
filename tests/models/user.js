@@ -5,14 +5,12 @@ define(["Lumos"],function(Lumos){
 
     self.name = user.name;
     self.email = user.email;
-
-
-
+    self.company = user.company_id;
+    
   }
 
   User.store = "users";
-  User.fields = {"name":{},"email":{}};
-
+  User.fields = {"name":{},"email":{}, "company":{}};
   Lumos.extend(User);
 
   return User;

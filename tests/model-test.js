@@ -6,7 +6,7 @@ define(["Lumos", "tests/models/user"],function(Lumos, User){
       migration1 = function(db) {
         var store = db.createObjectStore("users", {autoIncrement: true});
       }
-      Lumos.connect("application",[migration1], done, done);
+      Lumos.connect("app",[migration1], done, done);
     
     });
 
@@ -20,9 +20,9 @@ define(["Lumos", "tests/models/user"],function(Lumos, User){
           expect(user.email).toBe("mln@gmail.com");
           done();
         });
-        
-      });
 
+      });
+     
     }); 
 
     afterEach(function(done) {
