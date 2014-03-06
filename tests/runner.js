@@ -4,7 +4,8 @@ require.config({
 
 require(["tests/connection-test",
          "tests/model-test",
-         "tests/transaction-test"
+         "tests/transaction-test",
+         "tests/promise-test"
          ],
   function(){
     jasmine.runTests();

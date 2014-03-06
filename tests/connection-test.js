@@ -7,10 +7,17 @@ define(["Lumos"],function(Lumos, user){
         var store = db.createObjectStore("books", {keyPath: "isbn"});
       }
 
-      Lumos.connect("app",[migration1], function(){
+      Lumos.connect("app",[migration1]).then(function(){
         expect(Lumos.db().version).toBe(1);
         done();
-      }, done);
+      });
+    }); 
+
+    it("should fail on encountering an error", function(done) {
+      migration1 = function(db) {
+        throw "bwahahaha!";
+      }
+      Lumos.connect("app",[migration1]).catch(done);
     }); 
     
     it("should migrate existing database to new version", function(done) {
@@ -24,22 +31,20 @@ define(["Lumos"],function(Lumos, user){
         var store = db.createObjectStore("periodicals", {keyPath: "isbn"});
       }
 
-      Lumos.connect("app",[migration1], function(){
+      Lumos.connect("app",[migration1]).then(function(){
         expect(Lumos.db().version).toBe(1);
-        Lumos.close();
-
-          Lumos.connect("app",[migration1,migration2,migration3], function(){
-            expect(Lumos.db().version).toBe(3);
-            done();
-          }, done);
-
-      }, done);
-
+        return Lumos.close();
+      }).then(function(){
+        return Lumos.connect("app",[migration1,migration2,migration3]);        
+      }).then(function(){
+        expect(Lumos.db().version).toBe(3);
+        done();
+      });
 
     }); 
 
     afterEach(function(done) {
-      Lumos.destroy(done,done);
+      Lumos.destroy().then(done).catch(done);
     });
 
   });

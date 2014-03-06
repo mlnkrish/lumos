@@ -1,176 +1,273 @@
 (function (){
   var lumos;
 
+  var _ret = function(){
+    var self = this;
+    self.fns = []
+
+    self.then = function(fn){
+      fn.then = true;
+      self.fns.push(fn);
+      return self;
+    }
+
+    self.catch = function(fn){
+      fn.catch = true;
+      self.fns.push(fn);
+      return self;  
+    }
+  }
+
+  var P = function(fnc){
+    var ret = new _ret();
+    
+    var res = function(){
+      if(ret.fns.length != 0) {
+        var fn = ret.fns.shift();
+        try {
+          if(fn.then){
+            var result = fn.apply(this,arguments);
+            if(!!result) {
+              if(result.constructor === _ret){
+                result.fns = ret.fns;
+              }
+              else {
+                res(result);
+              }
+            }   
+          }else{
+            res.apply(this,arguments);
+          }
+        }catch(err){
+          rej(err);
+        }
+      }
+    }
+
+    var rej = function(){
+      if(ret.fns.length != 0) {
+        var fn = ret.fns.shift();
+        try {
+          if(fn.catch){
+            var result = fn.apply(this,arguments);
+            if(!!result) {
+              if(result.constructor === _ret){
+                result.fns = ret.fns;
+              }
+              else {
+                res(result);
+              }
+            }  
+          }else{
+            rej.apply(this,arguments);
+          }  
+        } catch(err){
+          rej(err);
+        }
+      } else {
+        throw arguments;
+      }
+    }
+
+    try {
+      fnc(res,rej);
+    } catch(err){
+      setTimeout(function(){rej(err);},0);
+    }
+
+    return ret; 
+  }
+
   var _lumos = function(){
     var self = this;
     var db;
     
-    
     //the datatbase to open and the array of migrations to run on that database.
-    self.connect = function(databaseName, migrations, success, error){
-      var request = indexedDB.open(databaseName,migrations.length);
+    self.connect = function(databaseName, migrations){
 
-      request.onupgradeneeded = function(event) {
-        db = request.result;
-        var newVersion = migrations.length;
-        console.log("migrating "+db.name+" from "+event.oldVersion+" to "+newVersion);
-        for(var i=event.oldVersion ; i<newVersion; i++) {
-          migrations[i](db);
-        }
-      };
+      return P(function(resolve,reject){
+        var request = indexedDB.open(databaseName,migrations.length);
 
-      request.onsuccess = function() {
-        db = request.result;
-        if(!!success) success();
-      };
+        request.onupgradeneeded = function(event) {
+          db = request.result;
+          var newVersion = migrations.length;
+          console.log("migrating "+db.name+" from "+event.oldVersion+" to "+newVersion);
+          for(var i=event.oldVersion ; i<newVersion; i++) {
+            migrations[i](db);
+          }
+        };
 
-      request.onerror = function(e) {
-        console.log("Encountered error: " + e.target.error.name);
-        if(!!error) error();
-      };
+        request.onsuccess = function() {
+          db = request.result;
+          resolve(db);
+        };
+
+        request.onerror = function(e) {
+          console.log("Encountered error: " + e.target.error.name);
+          reject();
+        };
+
+
+      });
+      
     }
 
     self.close = function(){
-      if(!!db) {
-        db.close();
-      }
+      return P(function(resolve,reject){
+        if(!!db) {
+          db.close();
+          db = null;
+          setTimeout(resolve,0);
+        } else {
+          setTimeout(resolve,0);
+        }
+      });
     }
 
     self.db = function(){
       return db;
     }
 
-    self.inTransaction = function(entities, unitOfWork, complete, error) {
-      var newEntities = [];
-      var storeNames = [];
-      
-      for(i=0; i<entities.length; i++) {
-        var e = entities[i];
-        storeNames.push(e.store);
-       
-      }
+    self.inTransaction = function(entities, unitOfWork) {
+      var self = this;
+      return P(function(resolve,reject){
+        var newEntities = [];
+        var storeNames = [];
+        
+        for(i=0; i<entities.length; i++) {
+          var e = entities[i];
+          storeNames.push(e.store);
+        }
 
-      var tx = db.transaction(storeNames, "readwrite");
+        var tx = db.transaction(storeNames, "readwrite");
 
-      for(i=0; i<entities.length; i++) {
-        //cloning entity definition
-        eval("var newE = " +  entities[i].toString());
-        newE.tx = tx;
-        newE.store = entities[i].store;
-        newE.fields = entities[i].fields;
-        lumos.extend(newE);
+        for(i=0; i<entities.length; i++) {
+          //cloning entity definition
+          eval("var newE = " +  entities[i].toString());
+          newE.tx = tx;
+          newE.store = entities[i].store;
+          newE.fields = entities[i].fields;
+          lumos.extend(newE);
 
-        newEntities.push(newE)
-      }
-      
-      unitOfWork.apply(tx,newEntities);
+          newEntities.push(newE)
+        }
+        
+        unitOfWork.apply(self,newEntities);
 
-      tx.oncomplete = function() {
-        if(!!complete) complete();
-      }
+        tx.oncomplete = function() {
+          resolve();
+        }
 
-      tx.onerror = function(e) {
-        console.log("Encountered error: " + e.target.error.name);
-        if(!!error) error();
-      }
+        tx.onerror = function(e) {
+          console.log("Encountered error: " + e.target.error.name);
+          reject();
+        }
 
-      tx.onabort = function(e) {
-        console.log("Transaction aborted");
-        if(!!error) error();
-      }
+        tx.onabort = function(e) {
+          console.log("Transaction aborted");
+          reject();
+        }
+      });
 
     }
 
-    self.destroy = function(success, error){
-      if(!!db) {
-        self.close();
-        deleteRequest = indexedDB.deleteDatabase(db.name);
-        deleteRequest.onsuccess = function() {
-          if(!!success) success();
+    self.destroy = function(){
+      return P(function(resolve,reject){
+        if(!!db) {
+          db.close();
+          var deleteRequest = indexedDB.deleteDatabase(db.name);
+          deleteRequest.onsuccess = function() {
+            resolve();
+          }
+          deleteRequest.onerror = function(e) {
+            console.log("Encountered error: " + e.target.error.name);
+            reject();
+          }  
+          db=null;
+        } else {
+          console.log("No database to destroy!");
+          reject();
         }
-        deleteRequest.onerror = function(e) {
-          console.log("Encountered error: " + e.target.error.name);
-          if(!!error) error();
-        }
-      } else {
-        console.log("No database to destroy!");
-        if(!!error) error();
-      }
+      });
+      
     }
 
     var classMethods = {
-      find : function(id, complete, error) {
+      find : function(id) {
         var clazz = this;
-        var hasRunningTransaction = (!!clazz.tx);
+        return P(function(resolve,reject){
+          var hasRunningTransaction = (!!clazz.tx);
 
-        //pick transaction
-        var tx;
-        if(hasRunningTransaction) {
-          tx=clazz.tx;
-        }
-        else {
-          tx = db.transaction(clazz.store, "readonly");
-        }
-
-        var store = tx.objectStore(clazz.store); 
-        var req = store.get(id); 
-        
-        req.onsuccess = function(){
-          if(!!complete) {
-            if(!!req.result)
-              complete(new clazz(req.result));
-            else
-              complete(null);
+          //pick transaction
+          var tx;
+          if(hasRunningTransaction) {
+            tx=clazz.tx;
           }
-        } 
-        req.onerror = function(e){
-          console.log("Encountered error: " + e.target.error.name);
-          if(!!error) error();
-        }  
-        
+          else {
+            tx = db.transaction(clazz.store, "readonly");
+          }
+
+          var store = tx.objectStore(clazz.store); 
+          var req = store.get(id); 
+          
+          req.onsuccess = function(){
+            if(!!req.result)
+              resolve(new clazz(req.result));
+            else
+              resolve(null);
+          } 
+          req.onerror = function(e){
+            console.log("Encountered error: " + e.target.error.name);
+            reject();
+          }  
+        });
       }
     }
 
     var objectMethods = {
-      save: function(complete,error) {
-        var toSave = {};
+      save: function() {
         var clazz = this.constructor;
-        var hasRunningTransaction = (!!clazz.tx);
-        
-        //pick transaction
-        var tx;
-        if(hasRunningTransaction) {
-          tx=clazz.tx
-        }
-        else {
-          tx = db.transaction(clazz.store, "readwrite");
-        }
+        var self = this;
+        return P(function(resolve,reject){
+          var toSave = {};
+          var hasRunningTransaction = (!!clazz.tx);
+          
+          //pick transaction
+          var tx;
+          if(hasRunningTransaction){
+            tx=clazz.tx
+          }
+          else {
+            tx = db.transaction(clazz.store, "readwrite");
+          }
 
-        //pick fields and save
-        for(var field in clazz.fields){
-          toSave[field] = this[field];
-        }
-        var store = tx.objectStore(clazz.store);
-        var req = store.put(toSave);
+          //pick fields and save
+          for(var field in clazz.fields){
+            toSave[field] = self[field];
+          }
+          var store = tx.objectStore(clazz.store);
+          var req = store.put(toSave);
 
-        //hook callbacks
-        if(hasRunningTransaction) {
-          req.onsuccess = function(){
-            if(!!complete) complete();
-          } 
-          req.onerror = function(e){
-            console.log("Encountered error: " + e.target.error.name);
-            if(!!error) error();
-          }  
-        } else {
-         tx.oncomplete = function() {
-           if(!!complete) complete();
-         }
-         tx.onerror = function(e) {
-           console.log("Encountered error: " + e.target.error.name);
-           if(!!error) error();
-         } 
-        }
+          //hook callbacks
+          if(hasRunningTransaction) {
+            req.onsuccess = function(){
+              resolve();
+            } 
+
+            req.onerror = function(e){
+              console.log("Encountered error: " + e.target.error.name);
+              reject();
+            }  
+          } else {
+           tx.oncomplete = function() {
+             resolve();
+           }
+           tx.onerror = function(e) {
+             console.log("Encountered error: " + e.target.error.name);
+             reject();
+           } 
+          }
+        });
       }
     }
 
@@ -189,6 +286,8 @@
         Object.defineProperty(entity.prototype, key, {value: objectMethods[key]})
       }
     }
+
+    self.P = P;
   }
   
   lumos = new _lumos();
